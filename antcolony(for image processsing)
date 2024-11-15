@@ -1,0 +1,115 @@
+import numpy as np
+import cv2
+import random
+import math
+import matplotlib.pyplot as plt
+
+# Parameters for Ant Colony Optimization
+n_ants = 50                # Number of ants
+n_iterations = 100         # Number of iterations
+alpha = 1                  # Influence of pheromone
+beta = 1                   # Influence of distance/visibility (pixel similarity)
+evaporation_rate = 0.1     # Pheromone evaporation rate
+q = 1                      # Total pheromone deposited per ant
+
+# Image loading and preprocessing
+image = cv2.imread('medical_image.jpg', cv2.IMREAD_GRAYSCALE)  # Grayscale image
+height, width = image.shape
+
+# Initialize pheromone map and visibility map
+pheromone_map = np.ones((height, width))  # Pheromone map, starts with 1
+visibility_map = 255 - image  # Inverse of image intensity as visibility (lower intensity = higher visibility)
+
+# Initialize ants' positions
+ants_positions = np.random.randint(0, height, size=(n_ants, 2))
+
+# Function to compute pixel similarity (e.g., Euclidean distance or intensity difference)
+def compute_similarity(x, y):
+    # Euclidean distance between two pixel intensities (foreground vs background)
+    return np.abs(int(image[x, y]) - 128)  # Threshold intensity (128) for foreground/background
+
+# Function to move an ant
+def move_ant(ant_position, pheromone_map, visibility_map, alpha, beta):
+    x, y = ant_position
+    # Calculate probabilities for the four neighboring pixels (up, down, left, right)
+    neighbors = [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]
+    probabilities = []
+    
+    for nx, ny in neighbors:
+        if 0 <= nx < height and 0 <= ny < width:
+            # Calculate the desirability (visibility) and pheromone level for each neighbor
+            pheromone_level = pheromone_map[nx, ny] ** alpha
+            visibility_level = visibility_map[nx, ny] ** beta
+            probability = pheromone_level * visibility_level
+            probabilities.append(probability)
+        else:
+            probabilities.append(0)
+    
+    # Normalize the probabilities
+    total_prob = sum(probabilities)
+    probabilities = [p / total_prob for p in probabilities]
+    
+    # Select the next move based on probabilities
+    move = random.choices(neighbors, probabilities)[0]
+    return move
+
+# Function to update pheromone levels
+def update_pheromones(pheromone_map, ants_positions, evaporation_rate, q):
+    pheromone_map *= (1 - evaporation_rate)  # Apply evaporation
+    
+    for x, y in ants_positions:
+        pheromone_map[x, y] += q  # Increase pheromone in the visited cell
+
+# Function to segment the image using ACO
+def aco_segmentation(image, n_ants, n_iterations, alpha, beta, evaporation_rate, q):
+    pheromone_map = np.ones((height, width))  # Initialize pheromone map
+    best_segmentation = None
+    best_score = float('inf')
+
+    for iteration in range(n_iterations):
+        ants_positions = np.random.randint(0, height, size=(n_ants, 2))  # Initialize ants' positions
+        visited_positions = []
+
+        # Simulate the movement of ants
+        for i in range(n_ants):
+            ant_position = tuple(ants_positions[i])
+            visited_positions.append(ant_position)
+            # Each ant moves through the image and creates a segmentation
+            for _ in range(100):  # Maximum number of steps an ant can take
+                ant_position = move_ant(ant_position, pheromone_map, visibility_map, alpha, beta)
+                visited_positions.append(ant_position)
+
+        # Update pheromone map based on visited positions
+        update_pheromones(pheromone_map, visited_positions, evaporation_rate, q)
+        
+        # Evaluate segmentation quality (objective function)
+        segmentation_score = evaluate_segmentation(visited_positions)
+        if segmentation_score < best_score:
+            best_score = segmentation_score
+            best_segmentation = visited_positions
+
+        # Optional: Print progress
+        if iteration % 10 == 0:
+            print(f"Iteration {iteration + 1}/{n_iterations}, Best Score: {best_score}")
+    
+    return best_segmentation
+
+# Function to evaluate the segmentation quality (e.g., based on the number of errors)
+def evaluate_segmentation(visited_positions):
+    # Here, you can implement your custom evaluation function. This could be based on:
+    # - Number of foreground vs. background pixels correctly classified
+    # - Similarity to ground truth (if available)
+    # - Edge sharpness, etc.
+    return len(visited_positions)  # Example: the number of visited positions (just a placeholder)
+
+# Run ACO for image segmentation
+best_segmentation = aco_segmentation(image, n_ants, n_iterations, alpha, beta, evaporation_rate, q)
+
+# Visualize the segmentation result
+segmentation_image = np.zeros_like(image)
+for (x, y) in best_segmentation:
+    segmentation_image[x, y] = 255  # Mark foreground pixels
+
+plt.imshow(segmentation_image, cmap='gray')
+plt.title("ACO Image Segmentation")
+plt.show()
