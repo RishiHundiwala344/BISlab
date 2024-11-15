@@ -1,0 +1,97 @@
+#implementation of load balancing in router networks using cuckoosearch
+
+import numpy as np
+
+# Parameters for the Cuckoo Search Algorithm
+n = 20                # Number of cuckoos (solutions)
+max_iter = 100        # Maximum number of iterations
+pa = 0.25             # Probability of discovery of an alien egg
+alpha = 0.01          # Step size for Lévy flight
+
+# Define the network parameters
+num_routers = 5       # Number of routers in the network
+router_capacity = [100, 100, 100, 100, 100]  # Example router capacities
+traffic_load = [300, 200, 400, 250, 150]  # Example traffic load demands
+
+# Define the objective function to minimize (Max load in any router)
+def objective_function(load_distribution, router_capacity, traffic_load):
+    # Compute the load on each router based on the distribution
+    router_loads = np.zeros(len(router_capacity))
+    
+    for i, load in enumerate(traffic_load):
+        router_index = int(load_distribution[i])
+        if router_index < len(router_capacity):
+            router_loads[router_index] += load
+    
+    # Objective: Minimize the maximum load across routers (balance the load)
+    max_load = np.max(router_loads)
+    return max_load
+
+# Initialize the cuckoo search algorithm
+def initialize_population(n, num_routers):
+    population = np.random.randint(0, num_routers, size=(n, len(traffic_load)))
+    return population
+
+# Lévy flight for exploration (random walk) without scipy
+def levy_flight(alpha, size):
+    # Use a power-law distribution (Lévy flight)
+    beta = 1.5
+    # Lévy flight uses the fact that step sizes follow a power-law distribution
+    # Using a normal distribution and scaling to match Lévy distribution
+    sigma = np.sqrt(alpha)  # Adjusted step size
+    s = np.random.normal(0, sigma, size)
+    t = np.random.normal(0, 1, size)
+    return s / np.abs(t)  # This creates the "Lévy flight" distribution
+
+# Cuckoo Search Algorithm for Load Balancing
+def cuckoo_search(traffic_load, router_capacity, n, max_iter, pa, alpha):
+    # Initialize population
+    population = initialize_population(n, num_routers)
+    
+    # Initialize the best solution
+    best_solution = None
+    best_objective = float('inf')
+
+    # Main optimization loop
+    for iteration in range(max_iter):
+        new_population = np.copy(population)
+        
+        # Evaluate the current population
+        for i in range(n):
+            objective = objective_function(population[i], router_capacity, traffic_load)
+            
+            # Update the best solution found so far
+            if objective < best_objective:
+                best_solution = population[i]
+                best_objective = objective
+        
+        # Generate new solutions using Lévy flight
+        for i in range(n):
+            step_size = alpha * levy_flight(alpha, len(traffic_load))
+            new_solution = population[i] + step_size
+            new_solution = np.clip(new_solution, 0, num_routers - 1).astype(int)
+            
+            # Evaluate new solution
+            new_objective = objective_function(new_solution, router_capacity, traffic_load)
+            
+            # If the new solution is better, replace the old one
+            if new_objective < best_objective:
+                population[i] = new_solution
+                best_solution = new_solution
+                best_objective = new_objective
+        
+        # Apply the probability of discovery of alien eggs
+        for i in range(n):
+            if np.random.rand() < pa:
+                population[i] = np.random.randint(0, num_routers, size=len(traffic_load))
+        
+        # Display progress
+        print(f"Iteration {iteration+1}/{max_iter}, Best Load Distribution: {best_solution}, Max Load: {best_objective}")
+    
+    return best_solution, best_objective
+
+# Run the Cuckoo Search Algorithm for Load Balancing
+best_solution, best_objective = cuckoo_search(traffic_load, router_capacity, n, max_iter, pa, alpha)
+
+print(f"Optimal load distribution: {best_solution}")
+print(f"Optimal objective (max load): {best_objective}")
