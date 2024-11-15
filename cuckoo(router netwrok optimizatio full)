@@ -1,0 +1,97 @@
+import random
+import math
+
+# Graph representation (adjacency matrix)
+# Example: 0 = no connection, positive number = edge weight
+graph = [
+    [0, 1, 2, 0, 0, 0],
+    [1, 0, 0, 3, 0, 0],
+    [2, 0, 0, 1, 4, 0],
+    [0, 3, 1, 0, 2, 5],
+    [0, 0, 4, 2, 0, 1],
+    [0, 0, 0, 5, 1, 0]
+]
+
+# Parameters for Cuckoo Search
+num_nests = 10  # Number of nests (solutions)
+max_generations = 30  # Max generations (iterations)
+pa = 0.20 # Probability of nest abandonment (solution replacement)
+alpha = 0.01  # Step size for Lévy flight (adjustment of new solutions)
+
+# Define start and end node (source and destination)
+start_node = 0
+end_node = 5
+
+# Fitness function: total cost of a path
+def fitness(path):
+    cost = 0
+    for i in range(len(path) - 1):
+        cost += graph[path[i]][path[i + 1]]
+    return cost
+
+# Generate a random path (solution)
+def generate_path():
+    path = [start_node]
+    while path[-1] != end_node:
+        current_node = path[-1]
+        neighbors = [i for i in range(len(graph)) if graph[current_node][i] > 0 and i not in path]
+        if not neighbors:  # If no neighbors are available (dead-end), break out
+            break
+        path.append(random.choice(neighbors))
+    return path
+
+# Lévy flight to generate new solutions (paths)
+def levy_flight(path):
+    # Random walk with a "long jump" characteristic (Lévy distribution)
+    new_path = path.copy()
+    step = random.randint(1, 2)
+    if random.random() > 0.5:
+        # Move to a random node within the graph, ensuring it’s connected
+        current_node = new_path[-1]
+        neighbors = [i for i in range(len(graph)) if graph[current_node][i] > 0 and i not in new_path]
+        if neighbors:
+            new_path.append(random.choice(neighbors))
+    else:
+        # Explore with a random jump (Lévy flight)
+        idx = random.randint(0, len(path) - 2)  # Pick a random node in the path
+        new_path[idx] = random.randint(0, len(graph) - 1)  # Randomly mutate the path
+    return new_path
+
+# Cuckoo Search Algorithm for optimizing routing paths
+def cuckoo_search():
+    # Initialize nests with random paths
+    nests = [generate_path() for _ in range(num_nests)]
+    fitness_values = [fitness(path) for path in nests]
+
+    best_solution = min(zip(nests, fitness_values), key=lambda x: x[1])
+
+    for generation in range(max_generations):
+        for i in range(num_nests):
+            # Generate new path using Lévy flight
+            new_path = levy_flight(nests[i])
+            new_fitness = fitness(new_path)
+
+            # If the new path is better, replace the old one
+            if new_fitness < fitness_values[i]:
+                nests[i] = new_path
+                fitness_values[i] = new_fitness
+
+        # Abandon nests with probability pa and replace them with random solutions
+        for i in range(num_nests):
+            if random.random() < pa:
+                nests[i] = generate_path()
+                fitness_values[i] = fitness(nests[i])
+
+        # Find the best solution so far
+        current_best = min(zip(nests, fitness_values), key=lambda x: x[1])
+        if current_best[1] < best_solution[1]:
+            best_solution = current_best
+
+        print(f"Generation {generation + 1}: Best fitness = {best_solution[1]}")
+
+    return best_solution
+
+# Running the Cuckoo Search algorithm
+best_path, best_cost = cuckoo_search()
+print("Optimal Path:", best_path)
+print("Optimal Path Cost:", best_cost)
