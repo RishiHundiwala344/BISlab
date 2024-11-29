@@ -1,0 +1,62 @@
+import numpy as np
+
+# Objective function: Dummy function for demonstration
+def fitness_function(solution):
+    """Fitness function mimicking data mining - minimizes the number of selected features."""
+    return np.sum(solution)  # Fewer selected features are better
+
+# Grey Wolf Optimization Algorithm (Simplified)
+class GreyWolfOptimizer:
+    def __init__(self, n_agents, n_features, max_iter):
+        self.n_agents = n_agents
+        self.n_features = n_features
+        self.max_iter = max_iter
+        # Initialize binary positions (0 or 1) randomly
+        self.positions = np.random.randint(2, size=(n_agents, n_features))
+        self.alpha, self.beta, self.delta = None, None, None
+
+    def optimize(self):
+        for iteration in range(self.max_iter):
+            # Evaluate fitness for all agents
+            fitness = np.array([fitness_function(agent) for agent in self.positions])
+            # Rank agents by fitness
+            sorted_indices = np.argsort(fitness)
+            self.alpha, self.beta, self.delta = (
+                self.positions[sorted_indices[0]],
+                self.positions[sorted_indices[1]],
+                self.positions[sorted_indices[2]],
+            )
+
+            # Update positions
+            for i in range(self.n_agents):
+                for j in range(self.n_features):
+                    r1, r2, r3 = np.random.random(), np.random.random(), np.random.random()
+                    A1, A2, A3 = 2 * r1 - 1, 2 * r2 - 1, 2 * r3 - 1
+                    C1, C2, C3 = 2 * np.random.random(), 2 * np.random.random(), 2 * np.random.random()
+
+                    D_alpha = abs(C1 * self.alpha[j] - self.positions[i][j])
+                    D_beta = abs(C2 * self.beta[j] - self.positions[i][j])
+                    D_delta = abs(C3 * self.delta[j] - self.positions[i][j])
+
+                    X1 = self.alpha[j] - A1 * D_alpha
+                    X2 = self.beta[j] - A2 * D_beta
+                    X3 = self.delta[j] - A3 * D_delta
+
+                    # Update position with a threshold
+                    self.positions[i][j] = 1 if (X1 + X2 + X3) / 3 > 0.5 else 0
+
+            # Output progress
+            print(f"Iteration {iteration + 1}, Best Fitness: {fitness[sorted_indices[0]]}")
+
+        return self.alpha
+
+# Example Usage
+if __name__ == "__main__":
+    # Simplified example with 5 agents, 10 features, and 10 iterations
+    n_agents = 5
+    n_features = 10
+    max_iter = 10
+
+    gwo = GreyWolfOptimizer(n_agents=n_agents, n_features=n_features, max_iter=max_iter)
+    best_solution = gwo.optimize()
+    print(f"Best Solution: {best_solution}")
