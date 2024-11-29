@@ -60,3 +60,127 @@ if __name__ == "__main__":
     gwo = GreyWolfOptimizer(n_agents=n_agents, n_features=n_features, max_iter=max_iter)
     best_solution = gwo.optimize()
     print(f"Best Solution: {best_solution}")
+
+
+
+
+
+#use this if modules can be downloaded
+
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+
+# Grey Wolf Optimization (GWO) Algorithm
+class GreyWolfOptimizer:
+    def __init__(self, obj_function, n_wolves, max_iter, dim, lower_bound, upper_bound):
+        self.obj_function = obj_function  # Objective function
+        self.n_wolves = n_wolves  # Number of wolves
+        self.max_iter = max_iter  # Maximum iterations
+        self.dim = dim  # Dimension of the problem
+        self.lower_bound = lower_bound  # Lower bound of the search space
+        self.upper_bound = upper_bound  # Upper bound of the search space
+        self.alpha_pos = np.zeros(dim)  # Position of the alpha wolf
+        self.alpha_score = float("inf")  # Score of the alpha wolf
+        self.beta_pos = np.zeros(dim)  # Position of the beta wolf
+        self.beta_score = float("inf")  # Score of the beta wolf
+        self.delta_pos = np.zeros(dim)  # Position of the delta wolf
+        self.delta_score = float("inf")  # Score of the delta wolf
+        self.positions = np.random.uniform(lower_bound, upper_bound, (n_wolves, dim))  # Initial positions of wolves
+        self.scores = np.zeros(n_wolves)  # Scores of the wolves
+
+    def optimize(self):
+        for t in range(self.max_iter):
+            for i in range(self.n_wolves):
+                self.scores[i] = self.obj_function(self.positions[i])  # Evaluate fitness function
+
+                if self.scores[i] < self.alpha_score:
+                    self.alpha_score = self.scores[i]
+                    self.alpha_pos = self.positions[i]
+
+                if self.scores[i] < self.beta_score and self.scores[i] > self.alpha_score:
+                    self.beta_score = self.scores[i]
+                    self.beta_pos = self.positions[i]
+
+                if self.scores[i] < self.delta_score and self.scores[i] > self.beta_score:
+                    self.delta_score = self.scores[i]
+                    self.delta_pos = self.positions[i]
+
+            a = 2 - t * (2 / self.max_iter)  # Decrease in a over time
+
+            # Update positions of wolves
+            for i in range(self.n_wolves):
+                for j in range(self.dim):
+                    r1 = np.random.random()
+                    r2 = np.random.random()
+
+                    A1 = 2 * a * r1 - a  # Coefficient A1
+                    C1 = 2 * r2  # Coefficient C1
+
+                    D_alpha = np.abs(C1 * self.alpha_pos[j] - self.positions[i, j])  # Distance to alpha
+                    X1 = self.alpha_pos[j] - A1 * D_alpha  # New position for alpha wolf
+
+                    A2 = 2 * a * r1 - a  # Coefficient A2
+                    C2 = 2 * r2  # Coefficient C2
+
+                    D_beta = np.abs(C2 * self.beta_pos[j] - self.positions[i, j])  # Distance to beta
+                    X2 = self.beta_pos[j] - A2 * D_beta  # New position for beta wolf
+
+                    A3 = 2 * a * r1 - a  # Coefficient A3
+                    C3 = 2 * r2  # Coefficient C3
+
+                    D_delta = np.abs(C3 * self.delta_pos[j] - self.positions[i, j])  # Distance to delta
+                    X3 = self.delta_pos[j] - A3 * D_delta  # New position for delta wolf
+
+                    # Update position of wolf
+                    self.positions[i, j] = (X1 + X2 + X3) / 3
+
+        return self.alpha_pos, self.alpha_score
+
+# Feature Selection Objective Function
+def feature_selection_function(position):
+    selected_features = [i for i, value in enumerate(position) if value > 0.5]
+    if len(selected_features) == 0:
+        return float("inf")  # No feature selected
+    X_selected = X_train[:, selected_features]
+    model = SVC(kernel='linear')
+    model.fit(X_selected, y_train)
+    y_pred = model.predict(X_selected)
+    return -accuracy_score(y_train, y_pred)  # Minimize the negative accuracy
+
+# Load Dataset
+data = load_iris()
+X = data.data
+y = data.target
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Initialize Grey Wolf Optimizer
+gwo = GreyWolfOptimizer(
+    obj_function=feature_selection_function,
+    n_wolves=30,  # Number of wolves
+    max_iter=50,  # Maximum number of iterations
+    dim=X_train.shape[1],  # Number of features
+    lower_bound=0,  # Lower bound for feature selection (0 or 1)
+    upper_bound=1  # Upper bound for feature selection (0 or 1)
+)
+
+# Run Optimization
+best_position, best_score = gwo.optimize()
+
+# Feature selection result
+selected_features = [i for i, value in enumerate(best_position) if value > 0.5]
+print(f"Selected Features: {selected_features}")
+
+# Evaluate on Test Set with Selected Features
+X_train_selected = X_train[:, selected_features]
+X_test_selected = X_test[:, selected_features]
+
+model = SVC(kernel='linear')
+model.fit(X_train_selected, y_train)
+y_pred = model.predict(X_test_selected)
+print(f"Test Accuracy: {accuracy_score(y_test, y_pred)}")
+
