@@ -1,0 +1,62 @@
+#this code is used for edge detecting in an image and uses parallel cellular algorithm 
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import convolve
+
+# Cellular Automaton for Image Processing
+class CellularAutomaton:
+    def __init__(self, image, kernel, threshold):
+        """
+        Initialize the CA with the image and rules.
+        :param image: Input grayscale image (2D numpy array).
+        :param kernel: Kernel for neighbor computation.
+        :param threshold: Threshold to determine state change.
+        """
+        self.image = image
+        self.kernel = kernel
+        self.threshold = threshold
+
+    def apply_rules(self):
+        """
+        Apply CA rules in parallel to update the image.
+        :return: Updated image (2D numpy array).
+        """
+        # Convolve image with the kernel to compute neighbor influence
+        neighbor_sum = convolve(self.image, self.kernel, mode='constant', cval=0)
+        
+        # Apply threshold to determine new state
+        new_image = (neighbor_sum > self.threshold).astype(int)
+        
+        return new_image
+
+def load_sample_image():
+    """Load a sample grayscale image."""
+    from skimage import data, color
+    img = color.rgb2gray(data.camera())  # Convert to grayscale
+    return (img > 0.5).astype(int)  # Binarize for simplicity
+
+# Main Execution
+if __name__ == "__main__":
+    # Load a sample image
+    image = load_sample_image()
+
+    # Define the CA kernel (e.g., Sobel-like kernel for edge detection)
+    kernel = np.array([[1, 1, 1],
+                       [1, -8, 1],
+                       [1, 1, 1]])
+
+    # Initialize CA with a threshold
+    threshold = 4
+    ca = CellularAutomaton(image, kernel, threshold)
+
+    # Run CA for a few iterations
+    iterations = 5
+    for i in range(iterations):
+        image = ca.apply_rules()
+
+    # Display the final result
+    plt.imshow(image, cmap='gray')
+    plt.title(f"Image after {iterations} CA iterations")
+    plt.axis('off')
+    plt.show()
